@@ -168,11 +168,13 @@ int tmin(void)
  */
 int isTmax(int x)
 {
-    int Tmin = ~(1 << 31); // Tmin 即是补码表示下的最小整数
-    int i = x + 1;
-    i = ~(i ^ x); // 如果 x 为 Tmax，i 将为 0x00000000
-    x = x + i;
-    return !(~(i | x | Tmin)); // 对 i, x, Tmin 进行或运算，若结果不为 0，返回 0，即 x 不是 Tmax；否则，返回 1，即 x 是 Tmax
+    int ck1 = ~x;
+    int ck2 = x + 1;
+
+    int ret = !(ck1^ck2);
+    // Then check if x == -1 or x + 1 == 0
+
+    return !!ck2 & ret;
 }
 
 /* 
@@ -190,6 +192,7 @@ int allOddBits(int x)
 
     return  !((mask & x) ^ mask);
 }
+
 /* 
  * negate - return -x 
  *   Example: negate(1) = -1.
@@ -212,10 +215,11 @@ int negate(int x)
  *   Max ops: 15
  *   Rating: 3
  */
+
 int isAsciiDigit(int x)
 {
-    int left = !((x + (~0x30 + 1)) >> 31) ;
-    int right = !((x + (~0x39 + 1)) >> 31) ;
+    int left= !((x + ~( 0x30 ) + 1) >> 31);
+    int right=!((0x39 + (~x) + 1) >> 31);
 
     return left & right;
 }
@@ -229,9 +233,11 @@ int isAsciiDigit(int x)
  */
 int conditional(int x, int y, int z)
 {
-    int k = x >> 31 ;
-  return 2;
+    x = !!x ;
+    x = ~x+1;
+    return (x & y)|( ~x & z);
 }
+
 /* 
  * isLessOrEqual - if x <= y  then return 1, else return 0 
  *   Example: isLessOrEqual(4,5) = 1.
@@ -239,9 +245,19 @@ int conditional(int x, int y, int z)
  *   Max ops: 24
  *   Rating: 3
  */
-int isLessOrEqual(int x, int y) {
-  return 2;
+int isLessOrEqual(int x, int y)
+{
+    int negX = ~x+1; //-x
+    int addX = negX+y; //y-x
+    int checkSign = addX >> 31 & 1;  //y-x的符号
+    int leftBit = 1 << 31; //最大位为1的32位有符号数
+    int xLeft = x & leftBit; //x的符号
+    int yLeft = y & leftBit; //y的符号
+    int bitXor = xLeft ^ yLeft; //x和y符号相同标志位，相同为0不同为1
+    bitXor = (bitXor >> 31) & 1; //符号相同标志位格式化为0或1
+    return ((!bitXor) & (!checkSign)) | (bitXor&(xLeft>>31)); //返回1有两种情况：符号相同标志位为0（相同）位与 y-x 的符号为0（y-x>=0）结果为1；符号相同标志位为1（不同）位与x的符号位为1（x<0）
 }
+
 //4
 /* 
  * logicalNeg - implement the ! operator, using all of 
@@ -251,9 +267,14 @@ int isLessOrEqual(int x, int y) {
  *   Max ops: 12
  *   Rating: 4 
  */
-int logicalNeg(int x) {
-  return 2;
+int logicalNeg(int x)
+{
+    int s1=(~((x ^ (~x + 1)) >> 31)) & 1; // & 1 表示将得到的值取最后一位
+    int s2=(~(x >> 31)) & 1;
+
+    return s1 & s2;
 }
+
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
  *  Examples: howManyBits(12) = 5
@@ -266,9 +287,34 @@ int logicalNeg(int x) {
  *  Max ops: 90
  *  Rating: 4
  */
-int howManyBits(int x) {
-  return 0;
+int howManyBits(int x)
+{
+    int s = x >> 31;
+    x ^= s ;
+
+    int bit_16 = !!(x >> 16);
+    x >>= (bit_16 << 4);
+
+    int bit_8 = !!(x >> 8);
+    x >>= (bit_8 << 3);
+
+    int bit_4 = !!(x >> 4);
+    x >>= (bit_4<<2);
+
+    int bit_2 = !!(x >> 2);
+    x >>= (bit_2 << 1);
+
+    int bit_1=!!(x >> 1);
+    x >>= (bit_1 << 0);
+
+    int ck = (!x) | (!(~x));
+    ck = (ck << 31) >> 31;
+
+    int sd_ans=(bit_16 << 4) + (bit_8 << 3) + (bit_4 << 2) + (bit_2 << 1) + (bit_1) + 2;
+
+    return (ck & 1) | ((~ck) & sd_ans);
 }
+
 //float
 /* 
  * floatScale2 - Return bit-level equivalent of expression 2*f for
@@ -281,9 +327,21 @@ int howManyBits(int x) {
  *   Max ops: 30
  *   Rating: 4
  */
-unsigned floatScale2(unsigned uf) {
-  return 2;
+unsigned floatScale2(unsigned uf)
+{
+    unsigned int s = uf >> 31;
+    unsigned int exp = (uf << 1) >> 24;
+    unsigned int frac=(uf << 9) >> 9;
+
+    if(exp == 255) return uf ; // exp == 255
+
+    else if(!frac && !exp) return uf ; // exp == 0   && frac == 0
+
+    else if(!exp) return (s << 31) + (frac << 1) ; // exp == 0   && frac != 0
+
+    else return (s << 31)+((exp + 1) << 23) + frac ; // 0<exp<255
 }
+
 /* 
  * floatFloat2Int - Return bit-level equivalent of expression (int) f
  *   for floating point argument f.
@@ -296,9 +354,37 @@ unsigned floatScale2(unsigned uf) {
  *   Max ops: 30
  *   Rating: 4
  */
-int floatFloat2Int(unsigned uf) {
-  return 2;
+int floatFloat2Int(unsigned uf)
+{
+    unsigned int s = (uf>>31);
+    unsigned int exp = (uf<<1)>>24;
+    unsigned int frac = (uf<<9)>>9;
+
+    if(!(exp^255)) return 0x80000000u;// NaN || infinity
+
+    else if(!exp) return 0;// denormal case(exp == 0)
+
+    else // normal case(0<exp<255)
+    {
+        frac += (1 << 23);
+        int bits = (150u - exp);
+
+        // bits<-7(这种情况会使只有0-23位的frac发生溢出)
+        if((bits + 7) >> 31) return 0x80000000u;
+        else
+        {
+            int tmp;
+            // bits小于0
+            if(bits >> 31) tmp = frac << ((~bits) + 1);
+                // bits大于31
+            else if((32 + (~bits)) >> 31) tmp = 0;
+            else tmp = frac >> bits;
+
+            return (!s) ? tmp : (~tmp) + 1;
+        }
+    }
 }
+
 /* 
  * floatPower2 - Return bit-level equivalent of the expression 2.0^x
  *   (2.0 raised to the power x) for any 32-bit integer x.
@@ -312,6 +398,10 @@ int floatFloat2Int(unsigned uf) {
  *   Max ops: 30 
  *   Rating: 4
  */
-unsigned floatPower2(int x) {
-    return 2;
+unsigned floatPower2(int x)
+{
+    if (x >= 128) return 0x7f800000;  // 超过128越界了
+    if (x >= -126) return (x + 127) << 23; // -126在界内，直接放进e
+    if (x >= -150) return 1 << (x + 150); //我们还有23位小数，也可以来表示一下
+    else return 0;
 }
