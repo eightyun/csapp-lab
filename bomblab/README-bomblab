@@ -75,7 +75,7 @@ ordered by the total number of accrued points.
 request server, result server, and report deamon, ensuring that
 exactly one of these processes (and itself) is running at any point in
 time. If one of these processes dies for some reason, the main daemon
-detects this and automatically restarts it. The main daemon is the
+detects this and automatically restarts it. The main daemon is thex
 only program you actually need to run.
 
 ********

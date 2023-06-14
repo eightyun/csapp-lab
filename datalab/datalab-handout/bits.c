@@ -398,6 +398,10 @@ int floatFloat2Int(unsigned uf)
  *   Max ops: 30 
  *   Rating: 4
  */
+// E = e - 127
+// V= 1*2^E
+// 指数范围是 -126 ~ 127
+// 根据浮点数表示，x就是指数表示
 unsigned floatPower2(int x)
 {
     if (x >= 128) return 0x7f800000;  // 超过128越界了
