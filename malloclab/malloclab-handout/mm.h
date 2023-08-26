@@ -11,7 +11,8 @@ extern void *mm_realloc(void *ptr, size_t size);
  * personal names and login IDs in a struct of this
  * type in their bits.c file.
  */
-typedef struct {
+typedef struct
+{
     char *teamname; /* ID1+ID2 or ID1 */
     char *name1;    /* full name of first member */
     char *id1;      /* login ID of first member */
