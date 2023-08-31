@@ -8,13 +8,24 @@
 #define NTHREADS 4
 #define SBUFSIZE 16
 
+/* You won't lose style points for including this long line in your code */
+static const char *user_agent_hdr = "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 Firefox/10.0.3\r\n";
+
+// 客户端与服务端相关
 struct Uri
 {
     char host[MAXLINE]; // hostname
     char port[MAXLINE]; // 端口
     char path[MAXLINE]; // 路径
 };
+void doit(int fd);
+void parse_uri(const char *uri, struct Uri *uri_data);
+void build_header(char *header, const char *host, const char *path);
+void send_request(int serverfd, char *header);
+void receive_response(int connfd, int serverfd);
+void sigpipe_handler(int signum);
 
+//多线程相关
 typedef struct
 {
     int * buf ;  // buffer array
@@ -25,25 +36,17 @@ typedef struct
     sem_t slots ;  // count s available slots
     sem_t items ; // counts available items
 }sbuf_t;
-
 sbuf_t sbuf ;
-
-/* You won't lose style points for including this long line in your code */
-static const char *user_agent_hdr = "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 Firefox/10.0.3\r\n";
-
-// 客户端与服务端相关签名
-void doit(int fd);
-void parse_uri(const char *uri, struct Uri *uri_data);
-void build_header(char *header, const char *host, const char *path);
-void send_request(int serverfd, char *header);
-void receive_response(int connfd, int serverfd);
-void sigpipe_handler(int signum);
-
-//多线程相关签名
 void sbuf_init (sbuf_t* sp , int n) ;
 void sbuf_insert (sbuf_t * sp , int item) ;
 int sbuf_remove (sbuf_t * sp) ;
 void * thread (void * vargp) ;
+
+//cache 以及 读写者模型
+int readcnt ;
+sem_t mutex , w ;
+void reader() ;
+void writer() ;
 
 
 void doit(int connfd)
@@ -194,6 +197,36 @@ void * thread (void * vargp) // 线程执行函数
         doit(connfd);
         //关闭客户端的连接描述符
         Close(connfd) ;
+    }
+}
+
+void reader()
+{
+    while (1)
+    {
+        P(&mutex) ;
+        readcnt++ ;
+
+        if(readcnt == 1)
+            P(&w) ;
+        V(&mutex) ;
+
+        P(&mutex) ;
+        readcnt-- ;
+
+        if(readcnt == 0)
+            V(&w) ;
+        V(&mutex) ;
+    }
+}
+
+void writer()
+{
+    while(1)
+    {
+        P(&w) ;
+
+        V(&w) ;
     }
 }
 
